@@ -1,0 +1,44 @@
+name: SkyHawk Recovery CI
+
+on:
+  workflow_dispatch:
+
+jobs:
+  skyhawk:
+    name: SkyHawk Recovery Builder
+    runs-on: ubuntu-18.04
+
+    steps:
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install zip gcc-multilib g++-multilib \
+            libc6-dev-i386 lib32ncurses5-dev lib32z1-dev \
+            libgl1-mesa-dev libxml2-utils xsltproc schedtool
+          sudo ln -f -s /usr/bin/python2.7 /usr/bin/python
+
+      - name: Sync SkyHawk Recovery sources
+        run: |
+          mkdir ~/skyhawk
+          cd ~/skyhawk
+
+          mkdir ~/.bin
+          sudo curl http://commondatastorage.googleapis.com/git-repo-downloads/repo | sudo tee /usr/bin/repo > /dev/zero
+          sudo chmod 777 /usr/bin/repo
+          repo init --depth=1 -u https://github.com/J110H-Android/shrp-7.1_manifest.git -b v3_7.1
+          repo sync -c --force-sync --optimized-fetch --no-tags --no-clone-bundle --prune -j$(nproc --all)
+          git clone --depth=1 --branch twrp-7.1 --single-branch https://github.com/J110H-Android/twrp_device_samsung_j1pop3g.git device/samsung/j1pop3g
+
+      - name: Build SkyHawk Recovery
+        run: |
+          cd ~/skyhawk
+          source build/envsetup.sh
+          export LC_ALL=C
+          lunch omni_j1pop3g-eng
+          mka recoveryimage
+
+      - name: Upload SkyHawk Recovery builds
+        uses: actions/upload-artifact@v2
+        with:
+          name: SkyHawk_j1pop3g
+          path: /home/runner/skyhawk/out/target/product/j1pop3g/recovery.img
